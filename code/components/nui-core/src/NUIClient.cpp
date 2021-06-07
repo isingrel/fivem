@@ -7,6 +7,7 @@
 
 #include "StdInc.h"
 #include "NUIClient.h"
+#include "NUIPClient.h"
 #include "NUIRenderHandler.h"
 #include "NUISchemeHandlerFactory.h"
 #include "CefOverlay.h"
@@ -20,6 +21,7 @@
 #include <rapidjson/document.h>
 
 #include <sstream>
+#include <include/cef_parser.h>
 
 static nui::IAudioSink* g_audioSink;
 
@@ -42,6 +44,7 @@ NUIClient::NUIClient(NUIWindow* window)
 	}
 
 	m_renderHandler = new NUIRenderHandler(this);
+	m_popoutHandler = new NUIPClient(this);
 
 	CefRefPtr<NUIClient> thisRef(this);
 
@@ -247,12 +250,61 @@ bool NUIClient::OnConsoleMessage(CefRefPtr<CefBrowser> browser, cef_log_severity
 	return false;
 }
 
+auto NUIClient::OnBeforePopup(CefRefPtr<CefBrowser> browser,
+	CefRefPtr<CefFrame> frame,
+	const CefString& target_url,
+	const CefString& target_frame_name,
+	CefLifeSpanHandler::WindowOpenDisposition target_disposition,
+	bool user_gesture,
+	const CefPopupFeatures& popupFeatures,
+	CefWindowInfo& windowInfo,
+	CefRefPtr<CefClient>& client,
+	CefBrowserSettings& settings,
+	CefRefPtr<CefDictionaryValue>& extra_info,
+	bool* no_javascript_access) -> bool
+{
+	if (target_disposition == WOD_NEW_FOREGROUND_TAB || target_disposition == WOD_NEW_BACKGROUND_TAB || target_disposition == WOD_NEW_POPUP || target_disposition == WOD_NEW_WINDOW )
+	{
+		CefURLParts url_parts;
+		if (CefParseURL(target_url, url_parts))
+		{
+			auto scheme = CefString(&url_parts.scheme).ToWString();
+			auto host = CefString(&url_parts.host).ToWString();
+			//auto target_url_str = target_url.ToWString();
+			//if (target_url_str.find(L"nui://") == 0 || target_url_str.find(L"https://cfx-nui-") == 0)
+			if (scheme == L"nui" || (scheme == L"https" && (host == L"nui-game-internal" || host.find(L"cfx-nui-") == 0) && host.find(L".") == std::string::npos))
+			{
+				CefWindowInfo wi;
+				wi.SetAsPopup(NULL, fmt::sprintf(L"FiveM - %s", host));
+
+				CefBrowserSettings s;
+
+				CefBrowserHost::CreateBrowser(wi, m_popoutHandler, target_url, s, NULL, NULL);
+			}
+		}
+
+		return true;
+	}
+	return false;
+}
+
 auto NUIClient::OnBeforeResourceLoad(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefRefPtr<CefRequest> request, CefRefPtr<CefRequestCallback> callback) -> ReturnValue
 {
+	auto url = request->GetURL().ToString();
+
+#ifndef USE_NUI_ROOTLESS
+	if (frame->IsMain())
+	{
+		if (frame->GetURL().ToString().find("nui://game/ui/") == 0 && url.find("nui://game/ui/") != 0)
+		{
+			trace("Blocked a request for root breaking URI %s\n", url);
+			return RV_CANCEL;
+		}
+	}
+#endif
+
 	for (auto& reg : m_requestBlacklist)
 	{
-		std::string url = request->GetURL().ToString();
-
 		try
 		{
 			if (std::regex_search(url, reg))

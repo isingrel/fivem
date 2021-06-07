@@ -23,15 +23,15 @@
 #include <regex>
 
 class NUIClient : public CefClient,
-	public CefLifeSpanHandler,
-	public CefDisplayHandler,
-	public CefContextMenuHandler,
-	public CefLoadHandler,
+                  public CefLifeSpanHandler,
+                  public CefDisplayHandler,
+                  public CefContextMenuHandler,
+                  public CefLoadHandler,
 #ifdef NUI_WITH_MEDIA_ACCESS
-	public CefMediaAccessHandler,
+                  public CefMediaAccessHandler,
 #endif
-	public CefRequestHandler,
-	public CefResourceRequestHandler
+                  public CefRequestHandler,
+                  public CefResourceRequestHandler
 {
 private:
 	NUIWindow* m_window;
@@ -43,6 +43,8 @@ private:
 	CefRefPtr<CefBrowser> m_browser;
 
 	std::vector<std::regex> m_requestBlacklist;
+
+	CefRefPtr<CefClient> m_popoutHandler;
 
 public:
 	NUIClient(NUIWindow* window);
@@ -117,6 +119,20 @@ protected:
 
 	virtual void OnBeforeClose(CefRefPtr<CefBrowser> browser) override;
 
+	virtual bool OnBeforePopup(CefRefPtr<CefBrowser> browser,
+		CefRefPtr<CefFrame> frame,
+		const CefString& target_url,
+		const CefString& target_frame_name,
+		CefLifeSpanHandler::WindowOpenDisposition target_disposition,
+		bool user_gesture,
+		const CefPopupFeatures& popupFeatures,
+		CefWindowInfo& windowInfo,
+		CefRefPtr<CefClient>& client,
+		CefBrowserSettings& settings,
+		CefRefPtr<CefDictionaryValue>& extra_info,
+		bool* no_javascript_access) override;
+
+
 // CefLoadHandler
 protected:
 	virtual void OnLoadStart(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, TransitionType transitionType) override;
@@ -180,6 +196,6 @@ protected:
 	virtual ReturnValue OnBeforeResourceLoad(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefRefPtr<CefRequest> request, CefRefPtr<CefRequestCallback> callback) override;
 
 	virtual void OnRenderProcessTerminated(CefRefPtr<CefBrowser> browser, TerminationStatus status) override;
-
+	
 	IMPLEMENT_REFCOUNTING(NUIClient);
 };
